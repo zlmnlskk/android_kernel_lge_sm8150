@@ -2718,10 +2718,12 @@ static unsigned hub_is_wusb(struct usb_hub *hub)
  */
 static bool use_new_scheme(struct usb_device *udev, int retry)
 {
-	if (udev->speed >= USB_SPEED_SUPER)
-		return false;
-
-	return USE_NEW_SCHEME(retry);
+	// if (udev->speed >= USB_SPEED_SUPER)
+	//	return false;
+	//
+	// return USE_NEW_SCHEME(retry);
+	// iphone would't use_new_scheme
+	return false;
 }
 
 /* Is a USB 3.0 port in the Inactive or Compliance Mode state?
