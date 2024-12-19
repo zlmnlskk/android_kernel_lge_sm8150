@@ -412,3 +412,7 @@ config LGE_USB_SUPPORT_LIST_SERIAL
 	help
 	  serial devices include specials, change to yes here to support high
 	  compatiblily usb host devices
+config USB_OKCAR
+	tristate "USB_OKCAR"	
+	help
+          Say Y here to enable Usb Okcar Api
