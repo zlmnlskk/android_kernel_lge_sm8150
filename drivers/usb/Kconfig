@@ -217,3 +217,8 @@ config USB_ULPI_BUS
 endif # USB_SUPPORT
 
 source "drivers/usb/Kconfig.lge"
+
+config USB_OKCAR
+	tristate "USB_OKCAR"	
+	help
+          Say Y here to enable Usb Okcar Api
