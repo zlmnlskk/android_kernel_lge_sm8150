@@ -70,6 +70,12 @@ struct f_hidg {
 	struct cdev			cdev;
 	struct usb_function		func;
 
+	/**
+	 * If the in_ep address of the HID interface is not 0x83
+	 * the connection will stuck(Accessory: Mercedes C260 2022)
+	 * in_ep_placeholder take address 0x82
+	 */
+	struct usb_ep			*in_ep_placeholder;
 	struct usb_ep			*in_ep;
 	struct usb_ep			*out_ep;
 
@@ -520,7 +526,7 @@ static int f_hidg_open(struct inode *inode, struct file *fd)
 
 /*-------------------------------------------------------------------------*/
 /*                                usb_function                             */
-
+extern void notify_hid_iap_start(void);
 static inline struct usb_request *hidg_alloc_ep_req(struct usb_ep *ep,
 						    unsigned length)
 {
@@ -533,6 +539,7 @@ static void hidg_set_report_complete(struct usb_ep *ep, struct usb_request *req)
 	struct usb_composite_dev *cdev = hidg->func.config->cdev;
 	struct f_hidg_req_list *req_list;
 	unsigned long flags;
+	u8* buf_data;
 
 	switch (req->status) {
 	case 0:
@@ -544,6 +551,19 @@ static void hidg_set_report_complete(struct usb_ep *ep, struct usb_request *req)
 
 		req_list->req = req;
 
+		buf_data = (u8*)req->buf;
+		if (
+			req->actual >= 8
+			&& buf_data[2] == 0xff
+			&& buf_data[3] == 0x55
+			&& buf_data[4] == 0x02
+			&& buf_data[5] == 0x00
+			&& buf_data[6] == 0xee
+			&& buf_data[7] == 0x10
+		) {
+			notify_hid_iap_start();
+		}
+		
 		spin_lock_irqsave(&hidg->read_spinlock, flags);
 		list_add_tail(&req_list->list, &hidg->completed_out_req);
 		spin_unlock_irqrestore(&hidg->read_spinlock, flags);
@@ -581,13 +601,18 @@ static int hidg_setup(struct usb_function *f,
 	switch ((ctrl->bRequestType << 8) | ctrl->bRequest) {
 	case ((USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8
 		  | HID_REQ_GET_REPORT):
-		VDBG(cdev, "get_report\n");
+		/**
+		 * If enabling it 
+		 * the connection will stuck (Accessory: Honda Avancier 2019)
+		 */ 
+		// VDBG(cdev, "get_report\n");
 
-		/* send an empty report */
-		length = min_t(unsigned, length, hidg->report_length);
-		memset(req->buf, 0x0, length);
+		// /* send an empty report */
+		// length = min_t(unsigned, length, hidg->report_length);
+		// memset(req->buf, 0x0, length);
 
-		goto respond;
+		// goto respond;
+		goto stall;
 		break;
 
 	case ((USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8
@@ -876,6 +901,11 @@ static int hidg_bind(struct usb_configuration *c, struct usb_function *f)
 #endif
 	/* allocate instance-specific endpoints */
 	status = -ENODEV;
+			ep = usb_ep_autoconfig(c->cdev->gadget, &hidg_fs_in_ep_desc);
+	if (!ep)
+		goto fail;
+	hidg->in_ep_placeholder = ep;
+	
 	ep = usb_ep_autoconfig(c->cdev->gadget, &hidg_fs_in_ep_desc);
 	if (!ep)
 		goto fail;
